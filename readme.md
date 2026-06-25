@@ -1,6 +1,6 @@
 # ToDo
 
-To do list application inspired by [dooit](https://dooit-org.github.io/), but with tasks grouped by due date instead of workspace.
+To do list application inspired by [dooit](https://github.com/dooit-org/dooit), but with tasks grouped by due date instead of workspace.
 
 ## Installation
 
