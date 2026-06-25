@@ -258,18 +258,20 @@ class ToDo(App):
 
     def action_complete(self) -> None:
         '''Toggle completion state of highlighted task'''
-        self.db.toggle_complete(self.highlighted_task)
-        self.show_tasks()
-        self.show_dates()
+        if self.active_panel == 'right':
+            self.db.toggle_complete(self.highlighted_task)
+            self.show_tasks()
+            self.show_dates()
 
     def action_edit(self) -> None:
         '''Edit highlighted task's description'''
-        self.active_input = 'edit_task'
-        input_widget = Input(
-            value=self.db.get_task(self.highlighted_task).get('description','')
-        )
-        self.query_one('#right').mount(input_widget)
-        input_widget.focus()
+        if self.active_panel == 'right':
+            self.active_input = 'edit_task'
+            input_widget = Input(
+                value=self.db.get_task(self.highlighted_task).get('description','')
+            )
+            self.query_one('#right').mount(input_widget)
+            input_widget.focus()
 
     def action_focus_left(self) -> None:
         '''Move focus to date panel'''
@@ -284,18 +286,20 @@ class ToDo(App):
 
     def action_priority(self) -> None:
         '''toggle priority state of highlighted task'''
-        self.db.toggle_priority(self.highlighted_task)
-        self.show_tasks()
-        self.show_dates()
+        if self.active_panel == 'right':
+            self.db.toggle_priority(self.highlighted_task)
+            self.show_tasks()
+            self.show_dates()
 
     def action_set_due(self) -> None:
         '''Set due date of highlighted task'''
-        self.active_input = 'set_due'
-        input_widget = Input(
-            value=self.db.get_task(self.highlighted_task).get('due','')
-        )
-        self.query_one('#right').mount(input_widget)
-        input_widget.focus()
+        if self.active_panel == 'right':
+            self.active_input = 'set_due'
+            input_widget = Input(
+                value=self.db.get_task(self.highlighted_task).get('due','')
+            )
+            self.query_one('#right').mount(input_widget)
+            input_widget.focus()
 
     # =========================
     #  Screen updates
