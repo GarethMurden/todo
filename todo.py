@@ -50,7 +50,7 @@ class ToDo(App):
             color: #01543c;
         }
 
-        .warning {
+        .priority {
             color: #D20000;
         }
     '''
@@ -88,7 +88,7 @@ class ToDo(App):
             if due is None:
                 due = datetime.now().strftime('%Y-%m-%d')
             self.cursor.execute(
-                'SELECT task_id, description, due, priority, complete FROM tasks WHERE due=?',
+                'SELECT task_id, description, due, priority, complete FROM tasks WHERE due=? ORDER BY priority DESC, description ASC',
                 (due, )
             )
             rows = self.cursor.fetchall()
@@ -212,7 +212,7 @@ class ToDo(App):
             elif self.priority != 0:
                 yield Label(
                     f' ☐ {self.description} ',
-                    classes='warning'
+                    classes='priority'
                 )
             else:
                 yield Label(
@@ -232,11 +232,12 @@ class ToDo(App):
             if self.due == datetime.now().strftime('%Y-%m-%d'):
                 due_text = 'Today'
             else:
-                due_text = self.due
+                due_text = datetime.strptime(self.due, '%Y-%m-%d').strftime('%a %d/%m')
 
             if self.due < datetime.now().strftime('%Y-%m-%d'):
                 yield Label(
-                    f' {due_text.ljust(10)} [{str(self.complete_count).rjust(1)}/{str(self.complete_count + self.incomplete_count).rjust(1)}] '              
+                    f' {due_text.ljust(10)} [{str(self.complete_count).rjust(1)}/{str(self.complete_count + self.incomplete_count).rjust(1)}] ',
+                    classes='priority'             
                 )
             else:
                 yield Label(
@@ -364,12 +365,14 @@ class ToDo(App):
         event.input.remove()
         self.show_tasks()
         self.show_dates()
+        self.active_panel = 'right'
+        self.query_one('#task_list').focus()
 
     def on_list_view_highlighted(self, event: ListView.Selected):
-        '''Navigate between tasks or dates'''
-        if self.active_panel == 'right':
+        '''Triggered on moving through list widget.'''
+        if self.active_panel == 'right': # task list
             self.highlighted_task = event.item.task_id
-        elif self.active_panel == 'left':
+        elif self.active_panel == 'left': # date list
             self.highlighted_date = event.item.due
             self.show_tasks()
         
