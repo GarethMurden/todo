@@ -120,9 +120,9 @@ class ToDo(App):
                 for row in rows:
                     dates.append({
                         'date': row[0],
-                        'priority_count': row[1],
-                        'incomplete_count': row[2],
-                        'complete_count': row[3]
+                        'incomplete_count': row[1],
+                        'complete_count': row[2],
+                        'priority_count': row[3],
                     })
             return dates
 
@@ -230,7 +230,7 @@ class ToDo(App):
             else:
                 due_text = self.due
             yield Label(
-                f' {due_text.ljust(10)} [{str(self.priority_count).rjust(1)}][{str(self.incomplete_count).rjust(1)}][{str(self.complete_count).rjust(1)}]'
+                f' {due_text.ljust(10)} [{str(self.complete_count).rjust(1)}/{str(self.complete_count + self.incomplete_count).rjust(1)}]'
             )
 
     # =========================
@@ -250,6 +250,7 @@ class ToDo(App):
         '''Toggle completion state of highlighted task'''
         self.db.toggle_complete(self.highlighted_task)
         self.show_tasks()
+        self.show_dates()
 
     def action_edit(self) -> None:
         '''Edit highlighted task's description'''
@@ -264,6 +265,7 @@ class ToDo(App):
         '''toggle priority state of highlighted task'''
         self.db.toggle_priority(self.highlighted_task)
         self.show_tasks()
+        self.show_dates()
 
     def action_set_due(self) -> None:
         '''Set due date of highlighted task'''
@@ -336,6 +338,7 @@ class ToDo(App):
 
         event.input.remove()
         self.show_tasks()
+        self.show_dates()
 
     def on_list_view_highlighted(self, event: ListView.Selected):
         self.highlighted_task = event.item.task_id
