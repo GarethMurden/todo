@@ -57,7 +57,7 @@ class ToDo(App):
 
     active_panel = 'right'
     highlighted_task = None
-    highlighted_date = None
+    highlighted_date = datetime.now().strftime('%Y-%m-%d')
     active_input = None
 
     # =========================
@@ -333,9 +333,9 @@ class ToDo(App):
             child.remove()
         date_list.extend(dates)
 
-    def show_tasks(self, due_date=None) -> None:
+    def show_tasks(self) -> None:
         '''Read tasks from db & inset into UI list'''
-        tasks = [self.TaskItem(t['task_id'], t['description'], t['complete'], t['priority']) for t in self.db.get_all_tasks()]
+        tasks = [self.TaskItem(t['task_id'], t['description'], t['complete'], t['priority']) for t in self.db.get_all_tasks(self.highlighted_date)]
         task_list = self.query_one('#task_list')
         for child in task_list.children:
             child.remove()
@@ -371,7 +371,7 @@ class ToDo(App):
             self.highlighted_task = event.item.task_id
         elif self.active_panel == 'left':
             self.highlighted_date = event.item.due
-            self.show_tasks(self.highlighted_date)
+            self.show_tasks()
         
     
 
