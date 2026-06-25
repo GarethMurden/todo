@@ -54,6 +54,7 @@ class ToDo(App):
     '''
 
     highlighted_task = None
+    active_input = None
 
     class Database():
         con = sqlite3.connect(f'{THIS_DIRECTORY}data.db')
@@ -68,8 +69,14 @@ class ToDo(App):
             )
             self.con.commit()
 
+        def edit_description(self, task_id, new_description) -> None:
+            self.cursor.execute(
+                'UPDATE tasks SET description=? WHERE task_id=?',
+                (new_description, task_id)
+            )
+            self.con.commit()
 
-        def get_tasks(self, due=None) -> list:
+        def get_all_tasks(self, due=None) -> list:
             if due is None:
                 due = datetime.now().strftime('%Y-%m-%d')
             self.cursor.execute(
@@ -88,6 +95,23 @@ class ToDo(App):
                         'complete':row[4] == 'TRUE'
                     })
             return tasks
+
+        def get_task(self, task_id) -> dict:
+            self.cursor.execute(
+                'SELECT task_id, description, due, priority, complete FROM tasks WHERE task_id=?',
+                (task_id, )
+            )
+            row = self.cursor.fetchone()
+            if row is not None:
+                return {
+                    'task_id':row[0],
+                    'description':row[1],
+                    'due':row[2],
+                    'priority':row[3],
+                    'complete':row[4] == 'TRUE'
+                }
+            else:
+                return {}
 
         def toggle_complete(self, task_id) -> None:
             self.cursor.execute(
@@ -157,6 +181,7 @@ class ToDo(App):
 
     def action_add_task(self) -> None:
         '''Add a new task to the currently selected date'''
+        self.active_input = 'new_task'
         input_widget = Input(
             placeholder='new task description'
         )
@@ -167,11 +192,17 @@ class ToDo(App):
         self.db.toggle_complete(self.highlighted_task)
         self.show_tasks()
 
+    def action_edit(self) -> None:
+        self.active_input = 'edit_task'
+        input_widget = Input(
+            value=self.db.get_task(self.highlighted_task).get('description','')
+        )
+        self.query_one('#right').mount(input_widget)
+        input_widget.focus()
+
     def action_priority(self) -> None:
         self.db.toggle_priority(self.highlighted_task)
         self.show_tasks()
-
-        
 
     # =========================
     #  Screen updates
@@ -191,7 +222,7 @@ class ToDo(App):
     
     def show_tasks(self) -> None:
         '''Read tasks from db & inset into UI list'''
-        tasks = [self.TaskItem(t['task_id'], t['description'], t['complete'], t['priority']) for t in self.db.get_tasks()]
+        tasks = [self.TaskItem(t['task_id'], t['description'], t['complete'], t['priority']) for t in self.db.get_all_tasks()]
         task_list = self.query_one('#task_list')
         for child in task_list.children:
             child.remove()
@@ -208,7 +239,11 @@ class ToDo(App):
         '''Triggered after Enter pressed in Input widget'''
         description = event.value
         if description != '':
-            self.db.add_task(description)
+            if self.active_input == 'new_task':
+                self.db.add_task(description)
+            if self.active_input == 'edit_task':
+                self.db.edit_description(self.highlighted_task, description)
+
         event.input.remove()
         self.show_tasks()
 
