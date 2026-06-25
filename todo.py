@@ -15,7 +15,9 @@ class ToDo(App):
         ('d', 'set_due', 'due date'),
         ('c', 'complete', 'complete'),
         ('p', 'priority', 'priority'),
-        ('e', 'edit', 'edit')
+        ('e', 'edit', 'edit'),
+        ('left', 'focus_left'),
+        ('right', 'focus_right')
     ]
 
     CSS = '''
@@ -48,12 +50,14 @@ class ToDo(App):
             color: #01543c;
         }
 
-        .priority {
+        .warning {
             color: #D20000;
         }
     '''
 
+    active_panel = 'right'
     highlighted_task = None
+    highlighted_date = None
     active_input = None
 
     # =========================
@@ -202,17 +206,17 @@ class ToDo(App):
         def compose( self ) -> ComposeResult:
             if self.complete:
                 yield Label(
-                    f' 🗹 {self.description}',
+                    f' 🗹 {self.description} ',
                     classes='complete'
                 )
             elif self.priority != 0:
                 yield Label(
-                    f' ☐ {self.description}',
-                    classes='priority'
+                    f' ☐ {self.description} ',
+                    classes='warning'
                 )
             else:
                 yield Label(
-                    f' ☐ {self.description}',
+                    f' ☐ {self.description} ',
                 )
 
     class DateItem(ListItem):
@@ -229,9 +233,15 @@ class ToDo(App):
                 due_text = 'Today'
             else:
                 due_text = self.due
-            yield Label(
-                f' {due_text.ljust(10)} [{str(self.complete_count).rjust(1)}/{str(self.complete_count + self.incomplete_count).rjust(1)}]'
-            )
+
+            if self.due < datetime.now().strftime('%Y-%m-%d'):
+                yield Label(
+                    f' {due_text.ljust(10)} [{str(self.complete_count).rjust(1)}/{str(self.complete_count + self.incomplete_count).rjust(1)}] '              
+                )
+            else:
+                yield Label(
+                    f' {due_text.ljust(10)} [{str(self.complete_count).rjust(1)}/{str(self.complete_count + self.incomplete_count).rjust(1)}] '
+                )
 
     # =========================
     #  Actions
@@ -260,6 +270,17 @@ class ToDo(App):
         )
         self.query_one('#right').mount(input_widget)
         input_widget.focus()
+
+    def action_focus_left(self) -> None:
+        '''Move focus to date panel'''
+        self.active_panel = 'left'
+        self.query_one('#date_list').focus()
+
+
+    def action_focus_right(self) -> None:
+        '''Move focus to task panel'''
+        self.active_panel = 'right'
+        self.query_one('#task_list').focus()
 
     def action_priority(self) -> None:
         '''toggle priority state of highlighted task'''
@@ -308,7 +329,7 @@ class ToDo(App):
             child.remove()
         date_list.extend(dates)
 
-    def show_tasks(self) -> None:
+    def show_tasks(self, due_date=None) -> None:
         '''Read tasks from db & inset into UI list'''
         tasks = [self.TaskItem(t['task_id'], t['description'], t['complete'], t['priority']) for t in self.db.get_all_tasks()]
         task_list = self.query_one('#task_list')
@@ -341,7 +362,12 @@ class ToDo(App):
         self.show_dates()
 
     def on_list_view_highlighted(self, event: ListView.Selected):
-        self.highlighted_task = event.item.task_id
+        '''Navigate between tasks or dates'''
+        if self.active_panel == 'right':
+            self.highlighted_task = event.item.task_id
+        elif self.active_panel == 'left':
+            self.highlighted_date = event.item.due
+            self.show_tasks(self.highlighted_date)
         
     
 
