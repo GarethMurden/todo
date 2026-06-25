@@ -56,6 +56,10 @@ class ToDo(App):
     highlighted_task = None
     active_input = None
 
+    # =========================
+    #  Database interactions
+    # ========================= 
+
     class Database():
         con = sqlite3.connect(f'{THIS_DIRECTORY}data.db')
         cursor = con.cursor()
@@ -95,6 +99,32 @@ class ToDo(App):
                         'complete':row[4] == 'TRUE'
                     })
             return tasks
+
+        def get_dates(self) -> list:
+            self.cursor.execute(
+                '''
+                SELECT
+                    due,
+                    SUM(CASE WHEN complete = 'FALSE' THEN 1 ELSE 0 END) AS incomplete_count,
+                    SUM(CASE WHEN complete = 'TRUE' THEN 1 ELSE 0 END) AS complete_count,
+                    SUM(CASE WHEN priority = 1 AND complete = 'FALSE' THEN 1 ELSE 0 END) AS priority_count
+                FROM tasks
+                GROUP BY due
+                HAVING SUM(CASE WHEN complete = 'FALSE' THEN 1 ELSE 0 END) > 0
+                ORDER BY due;
+                '''
+            )
+            rows = self.cursor.fetchall()
+            dates = []
+            if rows is not None:
+                for row in rows:
+                    dates.append({
+                        'date': row[0],
+                        'priority_count': row[1],
+                        'incomplete_count': row[2],
+                        'complete_count': row[3]
+                    })
+            return dates
 
         def get_task(self, task_id) -> dict:
             self.cursor.execute(
@@ -156,8 +186,12 @@ class ToDo(App):
 
     db = Database()
     
+    # =========================
+    #  Custom widgets
+    # ========================= 
+
     class TaskItem(ListItem):
-        '''Custom widget based in ListItem'''
+        '''Custom widget for tasks based on ListItem'''
         def __init__(self, task_id: int, description: str, complete: bool, priority: int) -> None:
             super().__init__()
             self.description = description
@@ -180,6 +214,24 @@ class ToDo(App):
                 yield Label(
                     f' ☐ {self.description}',
                 )
+
+    class DateItem(ListItem):
+        '''Custom widget for dates based on ListItem'''
+        def __init__(self, due: str, priority_count: int, incomplete_count: int, complete_count: int) -> None:
+            super().__init__()
+            self.due = due
+            self.priority_count = priority_count
+            self.incomplete_count = incomplete_count
+            self.complete_count = complete_count
+
+        def compose( self ) -> ComposeResult:
+            if self.due == datetime.now().strftime('%Y-%m-%d'):
+                due_text = 'Today'
+            else:
+                due_text = self.due
+            yield Label(
+                f' {due_text.ljust(10)} [{str(self.priority_count).rjust(1)}][{str(self.incomplete_count).rjust(1)}][{str(self.complete_count).rjust(1)}]'
+            )
 
     # =========================
     #  Actions
@@ -230,14 +282,30 @@ class ToDo(App):
         '''Create child widgets for the app.'''   
         yield Header()
 
-        yield Container(id='left')
+        date_list = ListView(id='date_list')
         yield Container(
-            ListView(id='task_list'),
+            date_list,
+            id='left'
+            )
+
+        task_list = ListView(id='task_list')
+        yield Container(
+            task_list,
             id='right'
         )
 
+        task_list.focus()
+
         yield Footer()
     
+    def show_dates(self) -> None:
+        '''Read tasks from db & list dates that have at least one task'''
+        dates = [self.DateItem(d['date'], d['priority_count'], d['incomplete_count'], d['complete_count'],) for d in self.db.get_dates()]
+        date_list = self.query_one('#date_list')
+        for child in date_list.children:
+            child.remove()
+        date_list.extend(dates)
+
     def show_tasks(self) -> None:
         '''Read tasks from db & inset into UI list'''
         tasks = [self.TaskItem(t['task_id'], t['description'], t['complete'], t['priority']) for t in self.db.get_all_tasks()]
@@ -248,6 +316,7 @@ class ToDo(App):
 
     def on_mount(self):
         '''Happens after all widgets have been drawn on-screen'''
+        self.show_dates()
         self.show_tasks()
 
     # =========================
