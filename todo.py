@@ -65,8 +65,15 @@ class ToDo(App):
     # ========================= 
 
     class Database():
-        con = sqlite3.connect(f'{THIS_DIRECTORY}data.db')
-        cursor = con.cursor()
+        con = None
+        cursor = None
+
+        def __init__(self):
+            if not os.path.exists(f'{THIS_DIRECTORY}data.db'):
+                os.rename(f'{THIS_DIRECTORY}data.db.template', f'{THIS_DIRECTORY}data.db')
+
+            self.con = sqlite3.connect(f'{THIS_DIRECTORY}data.db')
+            self.cursor = self.con.cursor()
 
         def add_task(self, description, due=None, priority=0) -> None:
             if due is None:
@@ -375,9 +382,7 @@ class ToDo(App):
         elif self.active_panel == 'left': # date list
             self.highlighted_date = event.item.due
             self.show_tasks()
-        
-    
 
 if __name__ == '__main__':
-        app = ToDo()
-        app.run()
+    app = ToDo()
+    app.run()
