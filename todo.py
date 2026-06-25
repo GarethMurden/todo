@@ -113,6 +113,13 @@ class ToDo(App):
             else:
                 return {}
 
+        def set_due(self, task_id, due_date) -> None:
+            self.cursor.execute(
+                'UPDATE tasks SET due=? WHERE task_id=?',
+                (due_date, task_id)
+            )
+            self.con.commit()
+
         def toggle_complete(self, task_id) -> None:
             self.cursor.execute(
                 'SELECT complete FROM tasks WHERE task_id=?',
@@ -174,7 +181,6 @@ class ToDo(App):
                     f' ☐ {self.description}',
                 )
 
-
     # =========================
     #  Actions
     # ========================= 
@@ -189,10 +195,12 @@ class ToDo(App):
         input_widget.focus()
 
     def action_complete(self) -> None:
+        '''Toggle completion state of highlighted task'''
         self.db.toggle_complete(self.highlighted_task)
         self.show_tasks()
 
     def action_edit(self) -> None:
+        '''Edit highlighted task's description'''
         self.active_input = 'edit_task'
         input_widget = Input(
             value=self.db.get_task(self.highlighted_task).get('description','')
@@ -201,8 +209,18 @@ class ToDo(App):
         input_widget.focus()
 
     def action_priority(self) -> None:
+        '''toggle priority state of highlighted task'''
         self.db.toggle_priority(self.highlighted_task)
         self.show_tasks()
+
+    def action_set_due(self) -> None:
+        '''Set due date of highlighted task'''
+        self.active_input = 'set_due'
+        input_widget = Input(
+            value=self.db.get_task(self.highlighted_task).get('due','')
+        )
+        self.query_one('#right').mount(input_widget)
+        input_widget.focus()
 
     # =========================
     #  Screen updates
@@ -235,14 +253,17 @@ class ToDo(App):
     # =========================
     #  Stuff triggered by user
     # ========================= 
+
     def on_input_submitted(self, event: Input.Submitted) -> None:
         '''Triggered after Enter pressed in Input widget'''
-        description = event.value
-        if description != '':
+        value = event.value
+        if value != '':
             if self.active_input == 'new_task':
-                self.db.add_task(description)
+                self.db.add_task(value)
             if self.active_input == 'edit_task':
-                self.db.edit_description(self.highlighted_task, description)
+                self.db.edit_description(self.highlighted_task, value)
+            if self.active_input == 'set_due':
+                self.db.set_due(self.highlighted_task, value)
 
         event.input.remove()
         self.show_tasks()
