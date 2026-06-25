@@ -1,9 +1,12 @@
 from datetime import datetime
 import os
+import parsedatetime
 import sqlite3
 from textual.containers import Container
 from textual.app import App, ComposeResult
 from textual.widgets import Footer, Header, Input, Label, ListItem, ListView
+
+cal = parsedatetime.Calendar()
 
 dirname, scriptname = os.path.split(os.path.abspath(__file__))
 THIS_DIRECTORY = f'{dirname}{os.sep}'
@@ -367,7 +370,12 @@ class ToDo(App):
             if self.active_input == 'edit_task':
                 self.db.edit_description(self.highlighted_task, value)
             if self.active_input == 'set_due':
-                self.db.set_due(self.highlighted_task, value)
+                time_struct, success = cal.parse(value)
+                if success:
+                    self.db.set_due(
+                        self.highlighted_task,
+                        datetime(*time_struct[:6]).strftime('%Y-%m-%d')
+                    )
 
         event.input.remove()
         self.show_tasks()
