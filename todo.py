@@ -1,0 +1,222 @@
+from datetime import datetime
+import os
+import sqlite3
+from textual.containers import Container
+from textual.app import App, ComposeResult
+from textual.widgets import Footer, Header, Input, Label, ListItem, ListView
+
+dirname, scriptname = os.path.split(os.path.abspath(__file__))
+THIS_DIRECTORY = f'{dirname}{os.sep}'
+
+class ToDo(App):
+    '''Terminal to do list'''
+    BINDINGS = [
+        ('a', 'add_task', 'add'),
+        ('d', 'set_due', 'due date'),
+        ('c', 'complete', 'complete'),
+        ('p', 'priority', 'priority'),
+        ('e', 'edit', 'edit')
+    ]
+
+    CSS = '''
+        Screen {
+            layout: horizontal;
+        }
+
+        #left, #right {
+            height: 100%;
+            border: solid #242F38;
+        }
+
+        #left {
+            width: 25%;
+        }
+
+        #right {
+            width: 75%;
+        }
+
+        ListView {
+            background: #121212;
+        }
+
+        ListView :focus {
+            background: black;
+        }
+
+        .complete {
+            color: #01543c;
+        }
+
+        .priority {
+            color: #D20000;
+        }
+    '''
+
+    highlighted_task = None
+
+    class Database():
+        con = sqlite3.connect(f'{THIS_DIRECTORY}data.db')
+        cursor = con.cursor()
+
+        def add_task(self, description, due=None, priority=0) -> None:
+            if due is None:
+                due = datetime.now().strftime('%Y-%m-%d')
+            self.cursor.execute(
+                'INSERT INTO tasks (description, due, priority) VALUES (?, ?, ?)',
+                (description, due, priority)
+            )
+            self.con.commit()
+
+
+        def get_tasks(self, due=None) -> list:
+            if due is None:
+                due = datetime.now().strftime('%Y-%m-%d')
+            self.cursor.execute(
+                'SELECT task_id, description, due, priority, complete FROM tasks WHERE due=?',
+                (due, )
+            )
+            rows = self.cursor.fetchall()
+            tasks = []
+            if rows is not None:
+                for row in rows:
+                    tasks.append({
+                        'task_id':row[0],
+                        'description':row[1],
+                        'due':row[2],
+                        'priority':row[3],
+                        'complete':row[4] == 'TRUE'
+                    })
+            return tasks
+
+        def toggle_complete(self, task_id) -> None:
+            self.cursor.execute(
+                'SELECT complete FROM tasks WHERE task_id=?',
+                (task_id,)
+            )
+            rows = self.cursor.fetchone()
+            if rows:
+                if rows[0] == 'TRUE':
+                    new_status = 'FALSE'
+                else:
+                    new_status = 'TRUE'
+                self.cursor.execute(
+                    'UPDATE tasks SET complete=? WHERE task_id=?',
+                    (new_status, task_id)
+                )
+                self.con.commit()
+
+        def toggle_priority(self, task_id) -> None:
+            self.cursor.execute(
+                'SELECT priority FROM tasks WHERE task_id=?',
+                (task_id,)
+            )
+            rows = self.cursor.fetchone()
+            if rows:
+                if rows[0] == 0:
+                    new_status = 1
+                else:
+                    new_status = 0
+                self.cursor.execute(
+                    'UPDATE tasks SET priority=? WHERE task_id=?',
+                    (new_status, task_id)
+                )
+                self.con.commit()
+
+    db = Database()
+    
+    class TaskItem(ListItem):
+        '''Custom widget based in ListItem'''
+        def __init__(self, task_id: int, description: str, complete: bool, priority: int) -> None:
+            super().__init__()
+            self.description = description
+            self.task_id = task_id
+            self.complete = complete
+            self.priority = priority
+
+        def compose( self ) -> ComposeResult:
+            if self.complete:
+                yield Label(
+                    f' 🗹 {self.description}',
+                    classes='complete'
+                )
+            elif self.priority != 0:
+                yield Label(
+                    f' ☐ {self.description}',
+                    classes='priority'
+                )
+            else:
+                yield Label(
+                    f' ☐ {self.description}',
+                )
+
+
+    # =========================
+    #  Actions
+    # ========================= 
+
+    def action_add_task(self) -> None:
+        '''Add a new task to the currently selected date'''
+        input_widget = Input(
+            placeholder='new task description'
+        )
+        self.query_one('#right').mount(input_widget)
+        input_widget.focus()
+
+    def action_complete(self) -> None:
+        self.db.toggle_complete(self.highlighted_task)
+        self.show_tasks()
+
+    def action_priority(self) -> None:
+        self.db.toggle_priority(self.highlighted_task)
+        self.show_tasks()
+
+        
+
+    # =========================
+    #  Screen updates
+    # ========================= 
+
+    def compose(self) -> ComposeResult:
+        '''Create child widgets for the app.'''   
+        yield Header()
+
+        yield Container(id='left')
+        yield Container(
+            ListView(id='task_list'),
+            id='right'
+        )
+
+        yield Footer()
+    
+    def show_tasks(self) -> None:
+        '''Read tasks from db & inset into UI list'''
+        tasks = [self.TaskItem(t['task_id'], t['description'], t['complete'], t['priority']) for t in self.db.get_tasks()]
+        task_list = self.query_one('#task_list')
+        for child in task_list.children:
+            child.remove()
+        task_list.extend(tasks)
+
+    def on_mount(self):
+        '''Happens after all widgets have been drawn on-screen'''
+        self.show_tasks()
+
+    # =========================
+    #  Stuff triggered by user
+    # ========================= 
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        '''Triggered after Enter pressed in Input widget'''
+        description = event.value
+        if description != '':
+            self.db.add_task(description)
+        event.input.remove()
+        self.show_tasks()
+
+    def on_list_view_highlighted(self, event: ListView.Selected):
+        self.highlighted_task = event.item.task_id
+        
+    
+
+if __name__ == '__main__':
+        app = ToDo()
+        app.run()
